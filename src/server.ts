@@ -13,6 +13,7 @@ import { registerSkillRuntimeRoute } from "./skills/runtime-route.js";
 import { SkillEvaluator } from "./skills/evaluation.js";
 import { registerSkillEvaluationRoute } from "./skills/evaluation-route.js";
 import { registerAgentPlannerRoute } from "./agents/planner-route.js";
+import { registerCollaborationRoute } from "./agents/collaboration-route.js";
 import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
 
@@ -52,6 +53,7 @@ registerSkillRuntimeRoute(app, skillRuntime, audit);
 const skillEvaluator = new SkillEvaluator(skillRuntime);
 registerSkillEvaluationRoute(app, skillEvaluator, audit);
 registerAgentPlannerRoute(app, skillRegistry, audit);
+registerCollaborationRoute(app, skillRegistry, audit);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
