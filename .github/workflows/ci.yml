@@ -12,6 +12,24 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ourai
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: ourai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ourai -d ourai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://ourai:ci-password@localhost:5432/ourai
+      AUTH_TOKEN_SECRET: ci-session-signing-secret-at-least-32-characters
+      API_KEY: ci-bootstrap-api-key-at-least-16
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,5 +39,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Verify PostgreSQL migrations
+        run: npm run db:migrate
       - name: Build production Docker image
         run: docker build -t our-ai-hub:ci .
