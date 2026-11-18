@@ -9,13 +9,13 @@
 - Multi-Agent Collaboration (stage 14 foundation): `POST /v1/agents/collaborate/plan` converts the deterministic task plan into a bounded application-owned coordinator/specialist/reviewer team, explicit step assignments, dependency handoffs, and structured output contracts. This is collaboration planning only: it does not start model instances, execute agents, invoke tools, or claim autonomous multi-agent work. The coordinator, specialist and reviewer are role definitions, not separate running processes.
 - Collaboration Evaluation & Observability (stage 15 foundation): `POST /v1/agents/collaborate/evaluate` rebuilds a bounded collaboration plan and runs deterministic contract checks for identity, size bounds, coordinator/role catalog, exact step coverage, handoff references and DAG validity, output contracts, disabled execution, and summary consistency. It returns check-level results and aggregate counts for agents, assignments, steps and handoffs; aggregate evaluation metadata is audited. This does not measure live agent latency, model quality, tool outcomes, or production runtime telemetry because agents are not yet executing.
 - Task Runtime (stage 8): `POST /v1/tasks`, `GET /v1/tasks/:id`, `POST /v1/tasks/:id/cancel`, and `GET /v1/tasks/:id/events` are backed by a leased worker loop. PostgreSQL mode claims queued work transactionally with `FOR UPDATE SKIP LOCKED`, records lifecycle events, applies bounded exponential retry, and recovers expired running leases; the in-memory development adapter supports the same basic lifecycle but is process-local. The only enabled task type is `agent.plan.validate`, which validates and records a plan in dry-run mode without executing its steps or causing external side effects. Arbitrary task types, shell commands, external tools, and skill execution are rejected or unsupported.
-- Model Router: provider-neutral adapter contract will be added before connecting upstream providers.
+- MCP External Integration (stage 16 foundation): stateless JSON-RPC over Streamable HTTP is exposed at `POST /mcp`. It supports initialize, ping, tools/list, tools/call and notification acknowledgements. The fixed tool catalog is read-only/planning-only: list/get skills, build deterministic task plans, build collaboration plans, and evaluate collaboration contracts. Calls reuse the API Gateway bearer authentication (except the existing public health endpoint), strict argument validation and audit metadata. Skill documents are labeled untrusted reference data. No MCP resource subscriptions, prompts, sampling, elicitation, agent execution, shell, arbitrary network tools, or third-party client interoperability certification are claimed. - Model Router: provider-neutral adapter contract will be added before connecting upstream providers.
 - Safety: default bind is loopback; secrets are environment-only; tool execution remains disabled until allowlists, scoped permissions and audit controls are complete.
 - Audit: API actions are written to audit_events when PostgreSQL is enabled.
 
 ## API v0.1
 
-- GET /health
+- POST /mcp (MCP Streamable HTTP JSON-RPC)\n- GET /health
 - POST /v1/memory/records
 - POST /v1/memory/search
 - GET /v1/skills
@@ -38,7 +38,7 @@
 1. Copy .env.example to .env and set a development API_KEY.
 2. Run docker compose up -d to start PostgreSQL + pgvector and initialize the schema on a fresh volume.
 3. Set DATABASE_URL in .env to enable persistent memory and task storage.
-4. Run npm install, npm run dev.
+4. Run npm install, npm run dev.\n5. Configure an API_KEY for non-local clients; MCP uses the same bearer authentication as the REST API.
 
 ## Explicit non-goals
 
