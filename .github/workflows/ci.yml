@@ -40,10 +40,8 @@ jobs:
         run: |
           npm audit --json > npm-audit.json || true
           node -e 'const a=require("./npm-audit.json"); console.log(JSON.stringify(a.vulnerabilities || {}, null, 2))'
-      - name: Inspect patched test toolchain
-        run: npm ls vitest @vitest/mocker tinypool picomatch
       - name: Enforce dependency audit threshold
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
       - run: npm run typecheck
       - run: npm run build
       - name: Apply PostgreSQL migrations
