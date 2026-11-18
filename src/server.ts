@@ -14,6 +14,7 @@ import { SkillEvaluator } from "./skills/evaluation.js";
 import { registerSkillEvaluationRoute } from "./skills/evaluation-route.js";
 import { registerAgentPlannerRoute } from "./agents/planner-route.js";
 import { registerCollaborationRoute } from "./agents/collaboration-route.js";
+import { registerCollaborationEvaluationRoute } from "./agents/collaboration-evaluation-route.js";
 import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
 
@@ -54,6 +55,7 @@ const skillEvaluator = new SkillEvaluator(skillRuntime);
 registerSkillEvaluationRoute(app, skillEvaluator, audit);
 registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
+registerCollaborationEvaluationRoute(app, skillRegistry, audit);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
