@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { z } from "zod";
+import { validatePlanSteps, type PlannedStep } from "../agents/planner.js";
 
 export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 export type TaskInput = { type: string; payload: Record<string, unknown> };
@@ -131,11 +133,25 @@ export class TaskRuntime {
 
   private async execute(task: TaskRecord): Promise<unknown> {
     if (task.input.type !== "agent.plan.validate") throw new Error("unsupported_task_type");
-    const plan = task.input.payload.plan as { steps?: unknown[]; executionEnabled?: unknown; planner?: unknown } | undefined;
-    if (!plan || !Array.isArray(plan.steps) || plan.steps.length < 1 || plan.steps.length > 12 || plan.executionEnabled !== false) {
-      throw new Error("invalid_or_unsafe_plan_payload");
-    }
-    return { accepted: true, executionMode: "validated-plan-only", stepCount: plan.steps.length, planner: plan.planner ?? "unknown", sideEffects: false };
+    const planSchema = z.object({
+      planner: z.string().max(100).optional(),
+      executionEnabled: z.literal(false),
+      steps: z.array(z.object({
+        id: z.string().min(1).max(100),
+        title: z.string().min(1).max(200),
+        description: z.string().max(2_000),
+        skillId: z.string().max(80).nullable(),
+        dependsOn: z.array(z.string().max(100)).max(12),
+        requiredCapabilities: z.array(z.string().max(100)).max(12),
+        risk: z.enum(["low", "medium", "high", "critical"]),
+        status: z.literal("planned")
+      }).strict()).min(1).max(12)
+    }).strict();
+    const parsed = planSchema.safeParse(task.input.payload.plan);
+    if (!parsed.success) throw new Error("invalid_or_unsafe_plan_payload");
+    const validation = validatePlanSteps(parsed.data.steps as PlannedStep[]);
+    if (!validation.valid) throw new Error("invalid_plan_dag:" + validation.errors.join(","));
+    return { accepted: true, executionMode: "validated-plan-only", stepCount: parsed.data.steps.length, order: validation.order, planner: parsed.data.planner ?? "unknown", sideEffects: false };
   }
 
   private async settle(task: TaskRecord, result: unknown, error?: string) {
