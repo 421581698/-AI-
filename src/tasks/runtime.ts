@@ -87,7 +87,7 @@ export class TaskRuntime {
     if (this.pool) {
       const r = await this.pool.query(
         "UPDATE tasks SET status='cancelled',locked_by=NULL,locked_until=NULL,updated_at=now() WHERE id=$1 AND owner_id IS NOT DISTINCT FROM $2 AND status='queued' RETURNING id,status,input,attempts,max_attempts,created_at,updated_at",
-        [id]
+        [id, ownerId]
       );
       if (r.rowCount) {
         await this.event(id, "task.cancelled", "queued", "cancelled");
@@ -96,7 +96,7 @@ export class TaskRuntime {
       return this.get(id, ownerId);
     }
     const task = this.memory.get(id);
-    if (!task) return null;
+    if (!task || task.ownerId !== ownerId) return null;
     if (task.status === "queued") {
       task.status = "cancelled"; task.updated_at = new Date().toISOString();
       await this.event(id, "task.cancelled", "queued", "cancelled");
