@@ -46,6 +46,18 @@ function verify(token: string, secret: string): Principal | null {
 }
 
 export class AuthService {
+  private readonly attempts = new Map<string, number[]>();
+  private limited(request: FastifyRequest, action: string): boolean {
+    const now = Date.now();
+    const key = action + ":" + request.ip;
+    const recent = (this.attempts.get(key) ?? []).filter((time) => now - time < 60_000);
+    recent.push(now);
+    this.attempts.set(key, recent);
+    if (this.attempts.size > 5000) {
+      for (const [entry, values] of this.attempts) if (values.every((time) => now - time >= 60_000)) this.attempts.delete(entry);
+    }
+    return recent.length > 10;
+  }
   constructor(private readonly pool: Pool, private readonly secret: string, private readonly bootstrapKey?: string) {}
   async authenticate(token: string | undefined): Promise<Principal | null> {
     if (!token) return null;
@@ -73,6 +85,7 @@ export class AuthService {
   }
   async register(app: FastifyInstance) {
     app.post("/v1/auth/register", async (request, reply) => {
+      if (this.limited(request, "register")) return reply.code(429).send({error:"rate_limited"});
       const parsed = credentials.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
       const id = randomUUID();
@@ -87,6 +100,7 @@ export class AuthService {
       }
     });
     app.post("/v1/auth/login", async (request, reply) => {
+      if (this.limited(request, "login")) return reply.code(429).send({error:"rate_limited"});
       const parsed = credentials.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error:"invalid_request" });
       const result = await this.pool.query("SELECT id,email,password_hash,role,status FROM users WHERE email=$1", [parsed.data.email]);
