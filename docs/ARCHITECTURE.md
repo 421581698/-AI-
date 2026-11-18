@@ -5,7 +5,7 @@
 - API Gateway: Fastify HTTP boundary, request IDs, body-size limit, schema validation, optional bearer authentication in development, and mandatory API key in production.
 - Memory Engine: namespace-scoped records with source, confidence, metadata and expiry. PostgreSQL persistence is enabled when DATABASE_URL is configured; otherwise a process-local development adapter is used. Current retrieval is lexical, not semantic.
 - Knowledge Engine: planned ingestion and hybrid lexical/vector retrieval on PostgreSQL + pgvector. Embedding provider integration is not implemented yet.
-- Skill Engine: repository-local skill discovery and read-only retrieval via `GET /v1/skills` and `GET /v1/skills/:id`, plus explainable task-to-skill ranking via `POST /v1/skills/select`. The selector uses transparent lexical matching and a small Chinese-to-English intent alias set; it returns scores, confidence, reasons and no-match when below threshold. It does not invoke an LLM or execute selected skills. It scans only the configured repository skill roots, validates identifiers, rejects path traversal and symlinks escaping the skill directory, and caps each `SKILL.md` at 128 KiB. Skill execution, tool grants and dynamic installation are not implemented.
+- Skill Engine: repository-local skill discovery and read-only retrieval via `GET /v1/skills` and `GET /v1/skills/:id`, plus explainable task-to-skill ranking via `POST /v1/skills/select` and bounded context assembly via `POST /v1/skills/context`. The context builder loads only selected repository skills, preserves provenance (version and SHA-256), enforces per-skill and total character budgets, and returns skill text as explicitly untrusted reference material with execution and tool access disabled. The selector uses transparent lexical matching and a small Chinese-to-English intent alias set; it returns scores, confidence, reasons and no-match when below threshold. It does not invoke an LLM or execute selected skills. It scans only the configured repository skill roots, validates identifiers, rejects path traversal and symlinks escaping the skill directory, and caps each `SKILL.md` at 128 KiB. Skill execution, tool grants and dynamic installation are not implemented.
 - Task Runtime: task creation, lookup and cancellation. PostgreSQL-backed task persistence is enabled when DATABASE_URL is configured. Workers, event history, leases, retries and replay remain planned.
 - Model Router: provider-neutral adapter contract will be added before connecting upstream providers.
 - Safety: default bind is loopback; secrets are environment-only; tool execution remains disabled until allowlists, scoped permissions and audit controls are complete.
@@ -19,6 +19,7 @@
 - GET /v1/skills
 - GET /v1/skills/:id
 - POST /v1/skills/select
+- POST /v1/skills/context
 - POST /v1/tasks
 - GET /v1/tasks/:id
 - POST /v1/tasks/:id/cancel
