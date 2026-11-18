@@ -50,12 +50,10 @@ jobs:
         run: npm test
       - name: Build production Docker image
         run: docker build -t our-ai-hub:ci .
-      - name: Verify PostgreSQL backup and restore
+      - name: Verify PostgreSQL backup and restore with matching PG16 tools
         run: |
-          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file=/tmp/our-ai-hub.dump
-          PGPASSWORD=ci-password createdb -h localhost -U ourai ourai_restore
-          pg_restore --dbname=postgres://ourai:ci-password@localhost:5432/ourai_restore --exit-on-error /tmp/our-ai-hub.dump
-          test "$(psql postgres://ourai:ci-password@localhost:5432/ourai_restore -Atc 'SELECT count(*) FROM schema_migrations')" -eq 4
+          docker run --rm --network host -v /tmp:/backup -e DATABASE_URL="$DATABASE_URL" --entrypoint sh pgvector/pgvector:pg16 -c 'pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file=/backup/our-ai-hub.dump'
+          docker run --rm --network host -v /tmp:/backup -e PGPASSWORD=ci-password --entrypoint sh pgvector/pgvector:pg16 -c 'createdb -h localhost -U ourai ourai_restore && pg_restore --dbname=postgres://ourai:ci-password@localhost:5432/ourai_restore --exit-on-error /backup/our-ai-hub.dump && test "$(psql postgres://ourai:ci-password@localhost:5432/ourai_restore -Atc '\''SELECT count(*) FROM schema_migrations'\'')" -eq 4'
       - name: Smoke test production container
         run: |
           docker run -d --name our-ai-hub-smoke --network host -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e DATABASE_URL="$DATABASE_URL" -e API_KEY="$API_KEY" -e AUTH_TOKEN_SECRET="$AUTH_TOKEN_SECRET" our-ai-hub:ci
