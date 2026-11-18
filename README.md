@@ -8,7 +8,7 @@
 
 ## Status
 
-Bootstrap repository initialized. See the development branch for the initial implementation plan.
+Development branch currently includes a first MCP-compatible HTTP integration at `POST /mcp`. It exposes a fixed read-only tool catalog for skill discovery, deterministic planning, collaboration planning, and contract evaluation. It does not execute agents or external actions.
 
 ## Coding-agent web standards
 
