@@ -2,6 +2,7 @@
   "name": "our-ai-hub",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Independent AI intelligence core and tool gateway",
   "engines": { "node": ">=22" },
   "scripts": {
