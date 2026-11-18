@@ -26,7 +26,10 @@ describe("Collaboration Evaluation", () => {
   it("detects duplicated step assignment and inconsistent summary", () => {
     const plan = buildCollaborationPlan("Build a modern accessible website", skills);
     const duplicated = structuredClone(plan);
-    duplicated.assignments[1].stepIds.push(duplicated.assignments[0].stepIds[0]);
+    const firstAssignment = duplicated.assignments[0];
+    const secondAssignment = duplicated.assignments[1];
+    if (!firstAssignment || !secondAssignment || !firstAssignment.stepIds[0]) throw new Error("expected at least two assignments with a step");
+    secondAssignment.stepIds.push(firstAssignment.stepIds[0]);
     duplicated.summary.stepCount += 1;
     const report = evaluateCollaborationPlan(duplicated);
     expect(report.status).toBe("failed");
