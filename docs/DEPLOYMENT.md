@@ -28,14 +28,14 @@ Open the browser console at `/console`. The REST API reference is in [API.md](AP
 - Persist and back up the `ourai_pgdata` volume.
 - Review resource limits and PostgreSQL sizing for the deployment environment.
 
-The Compose file is a self-hosting baseline, not a claim that a production environment has been deployed or security-certified. The current API still uses one shared bearer API key; per-user identities, scoped API keys and tenant isolation are future productization work.
+The Compose file is a self-hosting baseline, not a claim that a production environment has been deployed or security-certified. The API supports user accounts, 12-hour bearer sessions, per-user API keys, and owner-scoped memory/task access. Keep the bootstrap API key private; it is a privileged compatibility credential. Registration still lacks email verification and password recovery.
 
 ## Operations
 
 - Start/update: `docker compose up --build -d`
 - Logs: `docker compose logs -f api`
 - Stop without deleting data: `docker compose down`
-- Database backup: `docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > ourai.sql`
+- Database backup: `docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ourai.sql`
 - Database restore: restore into a separately verified database before switching production traffic.
 
 Never use `docker compose down -v` unless intentionally deleting the database volume.
