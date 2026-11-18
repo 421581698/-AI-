@@ -19,6 +19,7 @@ import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
 import { registerMcpRoute } from "./mcp/route.js";
 import { AuthService } from "./auth/service.js";
+import { consoleHtml } from "./console/page.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -70,6 +71,7 @@ registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
 registerCollaborationEvaluationRoute(app, skillRegistry, audit);
 registerMcpRoute(app, skillRegistry, audit);
+app.get("/console", async (_request, reply) => reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").send(consoleHtml));
 app.get("/v1/agents/catalog", async () => ({ agents: [ { id:"coordinator", role:"coordinator", executionEnabled:false }, { id:"specialist", role:"specialist", executionEnabled:false }, { id:"reviewer", role:"reviewer", executionEnabled:false } ] }));
 app.get("/v1/tools", async () => ({ tools: [ "list_skills", "get_skill", "plan_agent_task", "plan_collaboration", "evaluate_collaboration" ].map((name) => ({ name, enabled:true, executionMode:"read-only-or-planning" })) }));
 if (authService) await authService.register(app);
