@@ -40,6 +40,8 @@ jobs:
         run: |
           npm audit --json > npm-audit.json || true
           node -e 'const a=require("./npm-audit.json"); console.log(JSON.stringify(a.vulnerabilities || {}, null, 2))'
+      - name: Enforce dependency audit threshold
+        run: npm audit --audit-level=moderate
       - run: npm run typecheck
       - run: npm run build
       - name: Apply PostgreSQL migrations
@@ -48,3 +50,20 @@ jobs:
         run: npm test
       - name: Build production Docker image
         run: docker build -t our-ai-hub:ci .
+      - name: Verify PostgreSQL backup and restore
+        run: |
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file=/tmp/our-ai-hub.dump
+          PGPASSWORD=ci-password createdb -h localhost -U ourai ourai_restore
+          pg_restore --dbname=postgres://ourai:ci-password@localhost:5432/ourai_restore --exit-on-error /tmp/our-ai-hub.dump
+          test "$(psql postgres://ourai:ci-password@localhost:5432/ourai_restore -Atc 'SELECT count(*) FROM schema_migrations')" -eq 4
+      - name: Smoke test production container
+        run: |
+          docker run -d --name our-ai-hub-smoke --network host -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e DATABASE_URL="$DATABASE_URL" -e API_KEY="$API_KEY" -e AUTH_TOKEN_SECRET="$AUTH_TOKEN_SECRET" our-ai-hub:ci
+          trap 'docker rm -f our-ai-hub-smoke >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8787/health >/tmp/our-ai-hub-health.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/our-ai-hub-health.json
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/console)" = 200
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8787/v1/auth/me)" = 401
