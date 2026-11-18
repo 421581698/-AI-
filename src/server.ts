@@ -112,6 +112,13 @@ app.post("/v1/memory/search", async (request, reply) => {
 const taskInput = z.object({ type: z.string().min(1).max(120), payload: z.record(z.string(), z.unknown()) });
 type Task = { id: string; status: string; input: z.infer<typeof taskInput>; createdAt: string };
 const tasks = new Map<string, Task>();
+type TaskEvent = { id: string; taskId: string; eventType: string; fromStatus: string | null; toStatus: string; payload: Record<string, unknown>; createdAt: string };
+const taskEvents = new Map<string, TaskEvent[]>();
+function appendTaskEvent(event: TaskEvent) {
+  const events = taskEvents.get(event.taskId) ?? [];
+  events.push(event);
+  taskEvents.set(event.taskId, events);
+}
 
 app.post("/v1/tasks", async (request, reply) => {
   const parsed = taskInput.safeParse(request.body);
@@ -128,6 +135,15 @@ app.post("/v1/tasks", async (request, reply) => {
     task = { id: row.id, status: row.status, input: row.input, createdAt: row.created_at.toISOString() };
   } else {
     tasks.set(id, task);
+  }
+  const queuedAt = new Date().toISOString();
+  if (pool) {
+    await pool.query(
+      "INSERT INTO task_events(task_id, event_type, from_status, to_status, payload) VALUES ($1, 'task.queued', NULL, 'queued', $2)",
+      [id, JSON.stringify({ type: parsed.data.type })]
+    );
+  } else {
+    appendTaskEvent({ id: randomUUID(), taskId: id, eventType: "task.queued", fromStatus: null, toStatus: "queued", payload: { type: parsed.data.type }, createdAt: queuedAt });
   }
   await audit(request.id, "task.create", "success", { id, type: parsed.data.type });
   return reply.code(202).send(task);
@@ -155,15 +171,38 @@ app.post<{ Params: { id: string } }>("/v1/tasks/:id/cancel", async (request, rep
        RETURNING id, status, input, created_at`,
       [request.params.id]
     );
-    if (result.rowCount) return result.rows[0];
+    if (result.rowCount) {
+      await pool.query(
+        "INSERT INTO task_events(task_id, event_type, from_status, to_status) VALUES ($1, 'task.cancelled', 'queued', 'cancelled')",
+        [request.params.id]
+      );
+      return result.rows[0];
+    }
     const existing = await pool.query("SELECT id, status, input, created_at FROM tasks WHERE id = $1", [request.params.id]);
     if (!existing.rowCount) return reply.code(404).send({ error: "task_not_found" });
     return existing.rows[0];
   }
   const task = tasks.get(request.params.id);
   if (!task) return reply.code(404).send({ error: "task_not_found" });
-  if (task.status === "queued") task.status = "cancelled";
+  if (task.status === "queued") {
+    task.status = "cancelled";
+    appendTaskEvent({ id: randomUUID(), taskId: task.id, eventType: "task.cancelled", fromStatus: "queued", toStatus: "cancelled", payload: {}, createdAt: new Date().toISOString() });
+  }
   return task;
+});
+
+app.get<{ Params: { id: string } }>("/v1/tasks/:id/events", async (request, reply) => {
+  if (pool) {
+    const task = await pool.query("SELECT 1 FROM tasks WHERE id = $1", [request.params.id]);
+    if (!task.rowCount) return reply.code(404).send({ error: "task_not_found" });
+    const result = await pool.query(
+      "SELECT id, task_id, event_type, from_status, to_status, payload, created_at FROM task_events WHERE task_id = $1 ORDER BY id ASC",
+      [request.params.id]
+    );
+    return { events: result.rows };
+  }
+  if (!tasks.has(request.params.id)) return reply.code(404).send({ error: "task_not_found" });
+  return { events: taskEvents.get(request.params.id) ?? [] };
 });
 
 app.setErrorHandler((error, request, reply) => {
