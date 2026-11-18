@@ -10,6 +10,7 @@ function fakePool() {
   const keys:Key[]=[];
   const pool={ query: async (sql:string, values:unknown[] = []) => {
     if(sql.startsWith("INSERT INTO users")) {
+      if(users.some(x=>x.email===values[1])) throw Object.assign(new Error("duplicate"),{code:"23505"});
       const user:User={id:String(values[0]),email:String(values[1]),password_hash:String(values[2]),role:"user",status:"active"};
       users.push(user); return {rows:[{id:user.id,email:user.email,role:user.role}],rowCount:1};
     }
