@@ -44,7 +44,7 @@ describe("Collaboration Evaluation", () => {
 
   it("rejects any plan that enables execution", () => {
     const plan = buildCollaborationPlan("Write a poem about rain", skills);
-    const unsafe = { ...plan, executionEnabled: true as false };
+    const unsafe = { ...plan, executionEnabled: true as unknown as false };
     const report = evaluateCollaborationPlan(unsafe);
     expect(report.checks.find((check) => check.id === "execution-disabled")?.passed).toBe(false);
   });
