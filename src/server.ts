@@ -11,7 +11,7 @@ await app.register(cors, { origin: false });
 const pool = config.DATABASE_URL ? new Pool({ connectionString: config.DATABASE_URL, max: 10 }) : null;
 const skillRegistry = new SkillRegistry([
   new URL("../skills", import.meta.url).pathname,
-  new URL("../../.agents/skills", import.meta.url).pathname
+  new URL("../.agents/skills", import.meta.url).pathname
 ]);
 
 app.addHook("onClose", async () => { await pool?.end(); });
@@ -139,9 +139,9 @@ const tasks = new Map<string, Task>();
 type TaskEvent = { id: string; task_id: string; event_type: string; from_status: string | null; to_status: string; payload: Record<string, unknown>; created_at: string };
 const taskEvents = new Map<string, TaskEvent[]>();
 function appendTaskEvent(event: TaskEvent) {
-  const events = taskEvents.get(event.taskId) ?? [];
+  const events = taskEvents.get(event.task_id) ?? [];
   events.push(event);
-  taskEvents.set(event.taskId, events);
+  taskEvents.set(event.task_id, events);
 }
 
 app.post("/v1/tasks", async (request, reply) => {
