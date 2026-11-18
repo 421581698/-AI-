@@ -12,6 +12,7 @@ const inputSchema = z.object({
 }).strict();
 
 export function registerTaskRoutes(app: FastifyInstance, runtime: TaskRuntime, audit: (requestId: string, action: string, outcome: string, details: Record<string, unknown>) => Promise<void>): void {
+  app.get("/v1/tasks", async (request) => ({ tasks: await runtime.list(request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null) }));
   app.post("/v1/tasks", async (request, reply) => {
     const parsed = inputSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
