@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, realpath } from "node:fs/promises";
+import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 const MAX_SKILL_BYTES = 128 * 1024;
@@ -45,8 +45,8 @@ export class SkillRegistry {
       const file = path.join(directory, "SKILL.md");
       const fileReal = await realpath(file);
       if (path.dirname(fileReal) !== directory) return null;
-      const stat = await import("node:fs/promises").then((fs) => fs.stat(fileReal));
-      if (!stat.isFile() || stat.size > MAX_SKILL_BYTES) return null;
+      const fileStat = await stat(fileReal);
+      if (!fileStat.isFile() || fileStat.size > MAX_SKILL_BYTES) return null;
       const content = await readFile(fileReal, "utf8");
       const metadata = parseFrontmatter(content, id);
       return {
@@ -54,7 +54,7 @@ export class SkillRegistry {
         ...metadata,
         version: createHash("sha256").update(content).digest("hex").slice(0, 16),
         sha256: createHash("sha256").update(content).digest("hex"),
-        source: path.basename(rootReal) === "skills" ? "skills" : "agent-skills",
+        source: "repository",
         content
       };
     } catch {
