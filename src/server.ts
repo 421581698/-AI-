@@ -70,6 +70,8 @@ registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
 registerCollaborationEvaluationRoute(app, skillRegistry, audit);
 registerMcpRoute(app, skillRegistry, audit);
+app.get("/v1/agents/catalog", async () => ({ agents: [ { id:"coordinator", role:"coordinator", executionEnabled:false }, { id:"specialist", role:"specialist", executionEnabled:false }, { id:"reviewer", role:"reviewer", executionEnabled:false } ] }));
+app.get("/v1/tools", async () => ({ tools: [ "list_skills", "get_skill", "plan_agent_task", "plan_collaboration", "evaluate_collaboration" ].map((name) => ({ name, enabled:true, executionMode:"read-only-or-planning" })) }));
 if (authService) await authService.register(app);
 
 app.get("/v1/skills", async () => {
