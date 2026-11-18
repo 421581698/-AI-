@@ -65,6 +65,21 @@ export class TaskRuntime {
     return record;
   }
 
+  async list(ownerId: string | null = null, limit = 50): Promise<TaskRecord[]> {
+    if (this.pool) {
+      const r = await this.pool.query(
+        "SELECT id,status,input,result,error,attempts,max_attempts,created_at,updated_at FROM tasks WHERE owner_id IS NOT DISTINCT FROM $1 ORDER BY created_at DESC LIMIT $2",
+        [ownerId, Math.min(100, Math.max(1, limit))]
+      );
+      return r.rows.map((row) => this.mapRow(row));
+    }
+    return [...this.memory.values()]
+      .filter((task) => task.ownerId === ownerId)
+      .sort((a,b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, Math.min(100, Math.max(1, limit)))
+      .map((task) => this.publicTask(task));
+  }
+
   async get(id: string, ownerId: string | null = null): Promise<TaskRecord | null> {
     if (this.pool) {
       const r = await this.pool.query("SELECT id,status,input,result,error,attempts,max_attempts,created_at,updated_at FROM tasks WHERE id=$1 AND owner_id IS NOT DISTINCT FROM $2", [id, ownerId]);
