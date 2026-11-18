@@ -24,7 +24,7 @@ function parseFrontmatter(content: string, fallbackId: string) {
   const name = header.match(/^name:\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g, "") || fallbackId;
   const descriptionMatch = header.match(/^description:\s*\|\s*\r?\n((?:[ \t]+.*(?:\r?\n|$))*)/m);
   const description = descriptionMatch
-    ? descriptionMatch[1].split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join(" ")
+    ? (descriptionMatch[1] ?? "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join(" ")
     : header.match(/^description:\s*(.+)$/m)?.[1]?.trim().replace(/^["']|["']$/g, "") || "";
   return { name: name.slice(0, 120), description: description.slice(0, 2000) };
 }
