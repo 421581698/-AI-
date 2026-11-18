@@ -37,10 +37,13 @@ function tokenize(value: string, expandChineseAliases = false): string[] {
       tokens.push(chunk);
     }
   }
-  if (expandChineseAliases) {
-    for (const alias of bilingualAliases) {
-      if (alias.pattern.test(normalized)) tokens.push(...alias.tokens);
-    }
+  const matchedAliases = expandChineseAliases
+    ? bilingualAliases.filter((alias) => alias.pattern.test(normalized))
+    : [];
+  if (matchedAliases.length > 0) {
+    const latinTokens = tokens.filter((token) => /^[a-z0-9]+$/u.test(token));
+    tokens.length = 0;
+    tokens.push(...latinTokens, ...matchedAliases.flatMap((alias) => alias.tokens));
   }
   return [...new Set(tokens.filter((token) => token.length > 1))];
 }
