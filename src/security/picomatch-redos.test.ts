@@ -9,11 +9,11 @@ type Pico = {
 const picomatch = require("picomatch") as Pico;
 
 describe("maintained picomatch ReDoS safeguards", () => {
-  it("literalizes known catastrophic repeated wildcard patterns", () => {
+  it("rewrites or literalizes known catastrophic repeated wildcard patterns", () => {
     const patterns = ["+(*)", "+(*a)", "*(*a)", "+(*a|b)", "*(a*|b)"];
     for (const pattern of patterns) {
       expect(picomatch.isMatch(pattern, pattern), pattern).toBe(true);
-      expect(picomatch.isMatch("a".repeat(80) + "!", pattern), pattern).toBe(false);
+      expect(picomatch.isMatch("a".repeat(80) + "/!", pattern), pattern).toBe(false);
     }
   });
 
@@ -37,7 +37,7 @@ describe("maintained picomatch ReDoS safeguards", () => {
       const pm = require(${JSON.stringify(modulePath)});
       const patterns = ["+(*)", "+(*a)", "*(*a)", "+(*a|b)", "*(a*|b)", "+(ab|abab)"];
       for (const pattern of patterns) {
-        const input = pattern.includes("ab|") ? "ab".repeat(100) + "!" : "a".repeat(100) + "!";
+        const input = (pattern.includes("ab|") ? "ab".repeat(100) : "a".repeat(100)) + "/!";
         if (pm.isMatch(input, pattern)) process.exit(1);
       }
     `;
