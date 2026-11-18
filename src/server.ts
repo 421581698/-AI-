@@ -81,13 +81,18 @@ app.post("/v1/memory/search", async (request, reply) => {
 
   if (pool) {
     const result = await pool.query(
-      `SELECT id, namespace, content, source, confidence, metadata, created_at
+      `SELECT id, namespace, content, source, confidence, metadata, created_at,
+              greatest(
+                ts_rank(search_vector, plainto_tsquery('simple', $2)),
+                CASE WHEN content ILIKE $3 THEN 0.05 ELSE 0 END
+              ) AS score
        FROM memory_records
        WHERE namespace = $1
          AND (expires_at IS NULL OR expires_at > now())
-         AND content ILIKE $2
-       ORDER BY confidence DESC, created_at DESC LIMIT $3`,
-      [parsed.data.namespace, `%${parsed.data.query}%`, parsed.data.limit]
+         AND (search_vector @@ plainto_tsquery('simple', $2) OR content ILIKE $3)
+       ORDER BY score DESC, confidence DESC, created_at DESC
+       LIMIT $4`,
+      [parsed.data.namespace, parsed.data.query, `%${parsed.data.query}%`, parsed.data.limit]
     );
     await audit(request.id, "memory.search", "success", { namespace: parsed.data.namespace, count: result.rowCount ?? 0 });
     return { results: result.rows, mode: "postgres-lexical" };
