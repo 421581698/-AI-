@@ -4,10 +4,15 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { z } from "zod";
 import { config } from "./config.js";
+import { SkillRegistry } from "./skills/registry.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
 const pool = config.DATABASE_URL ? new Pool({ connectionString: config.DATABASE_URL, max: 10 }) : null;
+const skillRegistry = new SkillRegistry([
+  new URL("../skills", import.meta.url).pathname,
+  new URL("../../.agents/skills", import.meta.url).pathname
+]);
 
 app.addHook("onClose", async () => { await pool?.end(); });
 app.addHook("onRequest", async (request, reply) => {
@@ -28,6 +33,25 @@ async function audit(requestId: string, action: string, outcome: string, details
     app.log.error({ err: error, requestId, action }, "audit write failed");
   }
 }
+
+app.get("/v1/skills", async () => {
+  const skills = await skillRegistry.list();
+  return { skills, count: skills.length };
+});
+
+app.get<{ Params: { id: string } }>("/v1/skills/:id", async (request, reply) => {
+  const skill = await skillRegistry.get(request.params.id);
+  if (!skill) return reply.code(404).send({ error: "skill_not_found" });
+  await audit(request.id, "skill.read", "success", { skillId: skill.id, version: skill.version });
+  return {
+    id: skill.id,
+    name: skill.name,
+    description: skill.description,
+    version: skill.version,
+    sha256: skill.sha256,
+    content: skill.content
+  };
+});
 
 app.get("/health", async () => {
   let database: "connected" | "unconfigured" | "unavailable" = "unconfigured";
