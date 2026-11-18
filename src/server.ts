@@ -17,6 +17,7 @@ import { registerCollaborationRoute } from "./agents/collaboration-route.js";
 import { registerCollaborationEvaluationRoute } from "./agents/collaboration-evaluation-route.js";
 import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
+import { registerMcpRoute } from "./mcp/route.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -56,6 +57,7 @@ registerSkillEvaluationRoute(app, skillEvaluator, audit);
 registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
 registerCollaborationEvaluationRoute(app, skillRegistry, audit);
+registerMcpRoute(app, skillRegistry, audit);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
