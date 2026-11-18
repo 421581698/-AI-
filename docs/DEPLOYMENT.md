@@ -12,7 +12,7 @@ The repository includes a multi-stage Node.js 22 image and a Docker Compose stac
 ## First start
 
 1. Copy `.env.example` to `.env`.
-2. Replace `POSTGRES_PASSWORD`, `API_KEY`, and `AUTH_TOKEN_SECRET` with unique, long random secrets. Do not commit `.env`. Set `CORS_ORIGINS` to a comma-separated allowlist only when browser clients on other origins must call the API.
+2. Replace `POSTGRES_PASSWORD`, `API_KEY`, and `AUTH_TOKEN_SECRET` with unique, long random secrets encoded using URL-safe characters (such as base64url); the database password is embedded in a PostgreSQL connection URL. Do not commit `.env`. Set `CORS_ORIGINS` to a comma-separated allowlist only when browser clients on other origins must call the API.
 3. Run `docker compose up --build -d`.
 4. Check `docker compose ps` and `docker compose logs -f api`.
 5. Verify `GET /health` and an authenticated API request.
