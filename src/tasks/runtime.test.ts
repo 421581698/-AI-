@@ -24,7 +24,7 @@ describe("TaskRuntime", () => {
         { id: "a", title: "A", description: "A", skillId: null, dependsOn: ["b"], requiredCapabilities: [], risk: "low", status: "planned" },
         { id: "b", title: "B", description: "B", skillId: null, dependsOn: ["a"], requiredCapabilities: [], risk: "low", status: "planned" }
       ] } }
-    } as const;
+    };
     const task = await runtime.enqueue(cyclic);
     expect(await runtime.runOnce()).toBe(true);
     expect((await runtime.get(task.id))?.status).toBe("queued");
