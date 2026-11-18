@@ -15,7 +15,15 @@ export type SkillSelection = {
 
 const DEFAULT_THRESHOLD = 0.16;
 
-function tokenize(value: string): string[] {
+const bilingualAliases: Array<{ pattern: RegExp; tokens: string[] }> = [
+  { pattern: /现代网页|网页开发|网站开发|浏览器/u, tokens: ["modern", "web", "browser", "html", "css", "javascript"] },
+  { pattern: /无障碍|可访问性/u, tokens: ["accessibility"] },
+  { pattern: /网页性能|性能优化/u, tokens: ["performance", "optimization"] },
+  { pattern: /数据库|数据存储/u, tokens: ["database", "sql"] },
+  { pattern: /迁移|索引|查询优化/u, tokens: ["migration", "index", "query", "optimization"] }
+];
+
+function tokenize(value: string, expandChineseAliases = false): string[] {
   const normalized = value.normalize("NFKC").toLocaleLowerCase();
   const chunks = normalized.match(/[a-z0-9]+|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu) ?? [];
   const tokens: string[] = [];
@@ -27,6 +35,11 @@ function tokenize(value: string): string[] {
       }
     } else {
       tokens.push(chunk);
+    }
+  }
+  if (expandChineseAliases) {
+    for (const alias of bilingualAliases) {
+      if (alias.pattern.test(normalized)) tokens.push(...alias.tokens);
     }
   }
   return [...new Set(tokens.filter((token) => token.length > 1))];
@@ -45,7 +58,7 @@ export function selectSkills(
 ): SkillSelection {
   const limit = Math.min(10, Math.max(1, Math.trunc(options.limit ?? 5)));
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
-  const queryTokens = tokenize(task);
+  const queryTokens = tokenize(task, true);
   const ranked = skills.map((skill): SkillMatch => {
     const nameTokens = tokenize(skill.name.replace(/-/g, " "));
     const descriptionTokens = tokenize(skill.description);
