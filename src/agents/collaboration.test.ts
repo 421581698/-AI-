@@ -30,7 +30,7 @@ describe("Multi-Agent Collaboration Planner", () => {
   });
 
   it("bounds the team to the fixed application-owned catalog", () => {
-    const plan = buildCollaborationPlan("Build a website", skills, 3);
+    const plan = buildCollaborationPlan("Build a modern accessible website with CSS JavaScript and HTML", skills, 3);
     expect(plan.agents.map((agent) => agent.id)).toEqual(["coordinator", "specialist", "reviewer"]);
     expect(plan.agents.every((agent) => agent.executionMode === "planning-only")).toBe(true);
   });
