@@ -16,6 +16,20 @@ describe("TaskRuntime", () => {
     expect(events?.map((event) => event.event_type)).toEqual(["task.queued", "task.started", "task.completed"]);
   });
 
+  it("rejects a cyclic plan and schedules a bounded retry", async () => {
+    const runtime = new TaskRuntime(null, 5);
+    const cyclic = {
+      type: "agent.plan.validate",
+      payload: { plan: { executionEnabled: false, steps: [
+        { id: "a", title: "A", description: "A", skillId: null, dependsOn: ["b"], requiredCapabilities: [], risk: "low", status: "planned" },
+        { id: "b", title: "B", description: "B", skillId: null, dependsOn: ["a"], requiredCapabilities: [], risk: "low", status: "planned" }
+      ] } }
+    } as const;
+    const task = await runtime.enqueue(cyclic);
+    expect(await runtime.runOnce()).toBe(true);
+    expect((await runtime.get(task.id))?.status).toBe("queued");
+    expect((await runtime.getEvents(task.id))?.at(-1)?.event_type).toBe("task.retry_scheduled");
+  });
   it("rejects unsupported task types at the API boundary", async () => {
     const runtime = new TaskRuntime(null);
     const app = Fastify();
