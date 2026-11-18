@@ -46,6 +46,18 @@ describe("TaskRuntime", () => {
     expect(await runtime.runOnce()).toBe(false);
   });
 
+
+  it("isolates task reads, events, cancellation and listing by owner", async () => {
+    const runtime = new TaskRuntime(null);
+    const input = { type: "agent.plan.validate", payload: { plan: { executionEnabled: false, steps: [{ id: "a", title: "A", description: "A", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } };
+    const owned = await runtime.enqueue(input, "11111111-1111-4111-8111-111111111111");
+    expect(await runtime.get(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.getEvents(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.cancel(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.list("22222222-2222-4222-8222-222222222222")).toHaveLength(0);
+    expect(await runtime.list("11111111-1111-4111-8111-111111111111")).toHaveLength(1);
+  });
+
   it("returns false when the queue is empty", async () => {
     expect(await new TaskRuntime(null).runOnce()).toBe(false);
   });
