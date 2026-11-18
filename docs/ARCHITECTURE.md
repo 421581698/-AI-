@@ -13,7 +13,7 @@
 - Safety: default bind is loopback; secrets are environment-only; tool execution remains disabled until allowlists, scoped permissions and audit controls are complete.
 - Audit: API actions are written to audit_events when PostgreSQL is enabled.
 
-## API v0.1
+## Productization & deployment (stage 17 foundation)\n\nA multi-stage Node.js 22 Docker image and Docker Compose stack provide a self-hosting baseline. The API runs as a non-root user; PostgreSQL + pgvector is private to the Compose network, has a persistent volume, and gates API startup through health checks. SQL migrations run before the API starts. Production deployment guidance requires TLS ingress, secret replacement, firewall restrictions, backups and restore drills. This is deployment packaging only: it does not mean the service has been deployed. The current shared bearer API key is not a multi-user identity system; user accounts, tenant isolation, scoped API keys and a browser console remain future implementation work.\n\n## API v0.1
 
 - POST /mcp (MCP Streamable HTTP JSON-RPC)\n- GET /health
 - POST /v1/memory/records
