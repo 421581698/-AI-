@@ -19,6 +19,7 @@ import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
 import { registerMcpRoute } from "./mcp/route.js";
 import { AuthService } from "./auth/service.js";
+import { isPublicRoute } from "./auth/public-routes.js";
 import { consoleHtml } from "./console/page.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
@@ -33,7 +34,7 @@ app.decorateRequest("principal", null);
 const authService = pool ? new AuthService(pool, config.AUTH_TOKEN_SECRET ?? "development-only-secret-change-me-please", config.API_KEY) : null;
 app.addHook("onClose", async () => { await pool?.end(); });
 app.addHook("onRequest", async (request, reply) => {
-  if (request.url === "/health" || request.url === "/console" || request.url.startsWith("/v1/auth/register") || request.url.startsWith("/v1/auth/login")) return;
+  if (isPublicRoute(request.url)) return;
   const authorization = request.headers.authorization;
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
   if (authService) {
