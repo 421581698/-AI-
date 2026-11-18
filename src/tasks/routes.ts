@@ -15,7 +15,8 @@ export function registerTaskRoutes(app: FastifyInstance, runtime: TaskRuntime, a
   app.post("/v1/tasks", async (request, reply) => {
     const parsed = inputSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
-    const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;\n    const task = await runtime.enqueue(parsed.data, ownerId);
+    const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;
+    const task = await runtime.enqueue(parsed.data, ownerId);
     await audit(request.id, "task.create", "success", { id: task.id, type: parsed.data.type });
     return reply.code(202).send(task);
   });
