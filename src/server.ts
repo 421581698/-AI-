@@ -13,6 +13,8 @@ import { registerSkillRuntimeRoute } from "./skills/runtime-route.js";
 import { SkillEvaluator } from "./skills/evaluation.js";
 import { registerSkillEvaluationRoute } from "./skills/evaluation-route.js";
 import { registerAgentPlannerRoute } from "./agents/planner-route.js";
+import { TaskRuntime } from "./tasks/runtime.js";
+import { registerTaskRoutes } from "./tasks/routes.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -150,101 +152,10 @@ app.post("/v1/memory/search", async (request, reply) => {
   return { results, mode: "development-memory-adapter" };
 });
 
-const taskInput = z.object({ type: z.string().min(1).max(120), payload: z.record(z.string(), z.unknown()) });
-type Task = { id: string; status: string; input: z.infer<typeof taskInput>; createdAt: string };
-const tasks = new Map<string, Task>();
-type TaskEvent = { id: string; task_id: string; event_type: string; from_status: string | null; to_status: string; payload: Record<string, unknown>; created_at: string };
-const taskEvents = new Map<string, TaskEvent[]>();
-function appendTaskEvent(event: TaskEvent) {
-  const events = taskEvents.get(event.task_id) ?? [];
-  events.push(event);
-  taskEvents.set(event.task_id, events);
-}
-
-app.post("/v1/tasks", async (request, reply) => {
-  const parsed = taskInput.safeParse(request.body);
-  if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
-  const id = randomUUID();
-  const createdAt = new Date().toISOString();
-  let task: Task = { id, status: "queued", input: parsed.data, createdAt };
-  if (pool) {
-    const result = await pool.query(
-      "INSERT INTO tasks(id, status, input) VALUES ($1, 'queued', $2) RETURNING id, status, input, created_at",
-      [id, JSON.stringify(parsed.data)]
-    );
-    const row = result.rows[0] as { id: string; status: string; input: z.infer<typeof taskInput>; created_at: Date };
-    task = { id: row.id, status: row.status, input: row.input, createdAt: row.created_at.toISOString() };
-  } else {
-    tasks.set(id, task);
-  }
-  const queuedAt = new Date().toISOString();
-  if (pool) {
-    await pool.query(
-      "INSERT INTO task_events(task_id, event_type, from_status, to_status, payload) VALUES ($1, 'task.queued', NULL, 'queued', $2)",
-      [id, JSON.stringify({ type: parsed.data.type })]
-    );
-  } else {
-    appendTaskEvent({ id: randomUUID(), task_id: id, event_type: "task.queued", from_status: null, to_status: "queued", payload: { type: parsed.data.type }, created_at: queuedAt });
-  }
-  await audit(request.id, "task.create", "success", { id, type: parsed.data.type });
-  return reply.code(202).send(task);
-});
-
-app.get<{ Params: { id: string } }>("/v1/tasks/:id", async (request, reply) => {
-  if (pool) {
-    const result = await pool.query(
-      "SELECT id, status, input, result, error, created_at FROM tasks WHERE id = $1",
-      [request.params.id]
-    );
-    if (!result.rowCount) return reply.code(404).send({ error: "task_not_found" });
-    return result.rows[0];
-  }
-  const task = tasks.get(request.params.id);
-  if (!task) return reply.code(404).send({ error: "task_not_found" });
-  return task;
-});
-
-app.post<{ Params: { id: string } }>("/v1/tasks/:id/cancel", async (request, reply) => {
-  if (pool) {
-    const result = await pool.query(
-      `UPDATE tasks SET status = 'cancelled', updated_at = now()
-       WHERE id = $1 AND status = 'queued'
-       RETURNING id, status, input, created_at`,
-      [request.params.id]
-    );
-    if (result.rowCount) {
-      await pool.query(
-        "INSERT INTO task_events(task_id, event_type, from_status, to_status) VALUES ($1, 'task.cancelled', 'queued', 'cancelled')",
-        [request.params.id]
-      );
-      return result.rows[0];
-    }
-    const existing = await pool.query("SELECT id, status, input, created_at FROM tasks WHERE id = $1", [request.params.id]);
-    if (!existing.rowCount) return reply.code(404).send({ error: "task_not_found" });
-    return existing.rows[0];
-  }
-  const task = tasks.get(request.params.id);
-  if (!task) return reply.code(404).send({ error: "task_not_found" });
-  if (task.status === "queued") {
-    task.status = "cancelled";
-    appendTaskEvent({ id: randomUUID(), task_id: task.id, event_type: "task.cancelled", from_status: "queued", to_status: "cancelled", payload: {}, created_at: new Date().toISOString() });
-  }
-  return task;
-});
-
-app.get<{ Params: { id: string } }>("/v1/tasks/:id/events", async (request, reply) => {
-  if (pool) {
-    const task = await pool.query("SELECT 1 FROM tasks WHERE id = $1", [request.params.id]);
-    if (!task.rowCount) return reply.code(404).send({ error: "task_not_found" });
-    const result = await pool.query(
-      "SELECT id, task_id, event_type, from_status, to_status, payload, created_at FROM task_events WHERE task_id = $1 ORDER BY id ASC",
-      [request.params.id]
-    );
-    return { events: result.rows };
-  }
-  if (!tasks.has(request.params.id)) return reply.code(404).send({ error: "task_not_found" });
-  return { events: taskEvents.get(request.params.id) ?? [] };
-});
+const taskRuntime = new TaskRuntime(pool);
+registerTaskRoutes(app, taskRuntime, audit);
+taskRuntime.start();
+app.addHook("onClose", async () => { await taskRuntime.stop(); });
 
 app.setErrorHandler((error, request, reply) => {
   request.log.error({ err: error }, "request failed");
