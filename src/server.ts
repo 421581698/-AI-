@@ -10,6 +10,8 @@ import { registerSkillContextRoute } from "./skills/context-route.js";
 import { registerSkillPermissionRoute } from "./skills/permission-route.js";
 import { SkillRuntime } from "./skills/runtime.js";
 import { registerSkillRuntimeRoute } from "./skills/runtime-route.js";
+import { SkillEvaluator } from "./skills/evaluation.js";
+import { registerSkillEvaluationRoute } from "./skills/evaluation-route.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -44,6 +46,8 @@ registerSkillContextRoute(app, skillRegistry, audit);
 registerSkillPermissionRoute(app, skillRegistry, audit);
 const skillRuntime = new SkillRuntime(skillRegistry);
 registerSkillRuntimeRoute(app, skillRuntime, audit);
+const skillEvaluator = new SkillEvaluator(skillRuntime);
+registerSkillEvaluationRoute(app, skillEvaluator, audit);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
