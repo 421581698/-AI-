@@ -17,7 +17,7 @@ The repository includes a multi-stage Node.js 22 image and a Docker Compose stac
 4. Check `docker compose ps` and `docker compose logs -f api`.
 5. Verify `GET /health` and an authenticated API request.
 
-Open the browser console at `/console`. The REST API reference is in [API.md](API.md). The API listens on port 8787 inside the container. Set `API_PORT` to change the host port. The database is not published to the host.
+Open the browser console at `/console`. The REST API reference is in [API.md](API.md). The API listens on port 8787 inside the container. By default, Compose publishes it only on `127.0.0.1` to avoid exposing an unauthenticated HTTP listener directly to the network; put a TLS reverse proxy in front of it. If you intentionally need direct network exposure, set `API_BIND=0.0.0.0` and provide TLS and firewall controls yourself. Set `API_PORT` to change the host port. The database is not published to the host.
 
 ## Production network requirements
 
