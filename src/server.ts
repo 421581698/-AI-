@@ -113,21 +113,22 @@ const memoryInput = z.object({
   confidence: z.number().min(0).max(1).default(0.5),
   metadata: z.record(z.string(), z.unknown()).default({})
 });
-const memoryStore = new Map<string, z.infer<typeof memoryInput> & { id: string; createdAt: string }>();
+const memoryStore = new Map<string, z.infer<typeof memoryInput> & { id: string; createdAt: string; ownerId: string | null }>();
 
 app.post("/v1/memory/records", async (request, reply) => {
   const parsed = memoryInput.safeParse(request.body);
   if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
   const id = randomUUID();
   const createdAt = new Date().toISOString();
+  const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;
   if (pool) {
     await pool.query(
       `INSERT INTO memory_records(id, namespace, content, source, confidence, metadata)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, parsed.data.namespace, parsed.data.content, parsed.data.source, parsed.data.confidence, JSON.stringify(parsed.data.metadata)]
+      [id, ownerId, parsed.data.namespace, parsed.data.content, parsed.data.source, parsed.data.confidence, JSON.stringify(parsed.data.metadata)]
     );
   } else {
-    memoryStore.set(id, { ...parsed.data, id, createdAt });
+    memoryStore.set(id, { ...parsed.data, id, createdAt, ownerId });
   }
   await audit(request.id, "memory.create", "success", { id, namespace: parsed.data.namespace });
   return reply.code(201).send({ ...parsed.data, id, createdAt });
@@ -151,10 +152,10 @@ app.post("/v1/memory/search", async (request, reply) => {
        FROM memory_records
        WHERE namespace = $1
          AND (expires_at IS NULL OR expires_at > now())
-         AND (search_vector @@ plainto_tsquery('simple', $2) OR content ILIKE $3)
+         AND (search_vector @@ plainto_tsquery('simple', $3) OR content ILIKE $4)
        ORDER BY score DESC, confidence DESC, created_at DESC
        LIMIT $4`,
-      [parsed.data.namespace, parsed.data.query, `%${parsed.data.query}%`, parsed.data.limit]
+      [ownerId, parsed.data.namespace, parsed.data.query, `%${parsed.data.query}%`, parsed.data.limit]
     );
     await audit(request.id, "memory.search", "success", { namespace: parsed.data.namespace, count: result.rowCount ?? 0 });
     return { results: result.rows, mode: "postgres-lexical" };
@@ -162,7 +163,7 @@ app.post("/v1/memory/search", async (request, reply) => {
 
   const terms = parsed.data.query.toLowerCase().split(/\s+/).filter(Boolean);
   const results = [...memoryStore.values()]
-    .filter((item) => item.namespace === parsed.data.namespace)
+    .filter((item) => item.ownerId === ownerId && item.namespace === parsed.data.namespace)
     .map((item) => ({ item, score: terms.reduce((n, term) => n + (item.content.toLowerCase().includes(term) ? 1 : 0), 0) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || b.item.createdAt.localeCompare(a.item.createdAt))
