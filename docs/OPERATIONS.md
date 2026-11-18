@@ -54,6 +54,12 @@ For a planned production recovery, stop API writers, take a final backup of the 
 - Review reverse-proxy and application logs, but avoid logging bearer tokens, passwords, memory contents, or skill contents.
 - If compromise is suspected, isolate ingress first and preserve logs/backups for investigation.
 
+## Development-toolchain advisory: picomatch
+
+As of 2026-11-18, the full development dependency audit reports a high-severity picomatch advisory (GHSA-fc5q-39xc-vjpf / CVE-2026-112366) through the Vitest/Vite test-toolchain dependency graph. The npm package registry does not offer a version newer than the affected 4.0.7 range, and the upstream proposed fix was closed without being merged; the package maintainer disputes the report. Do not force-downgrade Vitest: the attempted 3.1.4 downgrade introduces additional vulnerable transitive packages, including critical tinypool advisories.
+
+In this release, this dependency graph is development-only and is pruned from the production image. The production dependency audit remains clean. Do not pass untrusted user-controlled glob/extglob patterns to this toolchain. Keep the full audit visible, re-check the upstream advisory and npm releases on dependency updates, and remove this note only after a published fixed release is adopted and verified. This is a documented residual development-toolchain advisory, not a claim that the full dependency tree is vulnerability-free.
+
 ## Current release limitations
 
 - Authentication throttling is process-local, not distributed.
