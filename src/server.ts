@@ -104,7 +104,7 @@ app.get("/health", async (_request, reply) => {
   }
   if (database === "unavailable") return reply.code(503).send({ ok: false, service: "our-ai-hub", database, timestamp: new Date().toISOString() });
   return {
-    ok: database !== "unavailable",
+    ok: true,
     service: "our-ai-hub",
     version: "0.1.0",
     database,
