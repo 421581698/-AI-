@@ -37,9 +37,10 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run typecheck
-      - run: npm test
       - run: npm run build
-      - name: Verify PostgreSQL migrations
+      - name: Apply PostgreSQL migrations
         run: npm run db:migrate
+      - name: Run unit and PostgreSQL integration tests
+        run: npm test
       - name: Build production Docker image
         run: docker build -t our-ai-hub:ci .
