@@ -1,0 +1,64 @@
+import { describe, expect, it } from "vitest";
+import Fastify from "fastify";
+import { TaskRuntime } from "./runtime.js";
+import { registerTaskRoutes } from "./routes.js";
+
+describe("TaskRuntime", () => {
+  it("runs the allowlisted plan-validation task and records lifecycle events", async () => {
+    const runtime = new TaskRuntime(null, 5);
+    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { planner: "deterministic-skill-planner", executionEnabled: false, steps: [{ id: "review", title: "Review", description: "Validate", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } });
+    expect(task.status).toBe("queued");
+    expect(await runtime.runOnce()).toBe(true);
+    const completed = await runtime.get(task.id);
+    expect(completed?.status).toBe("completed");
+    expect(completed?.result).toMatchObject({ accepted: true, executionMode: "validated-plan-only", sideEffects: false });
+    const events = await runtime.getEvents(task.id);
+    expect(events?.map((event) => event.event_type)).toEqual(["task.queued", "task.started", "task.completed"]);
+  });
+
+  it("rejects a cyclic plan and schedules a bounded retry", async () => {
+    const runtime = new TaskRuntime(null, 5);
+    const cyclic = {
+      type: "agent.plan.validate",
+      payload: { plan: { executionEnabled: false, steps: [
+        { id: "a", title: "A", description: "A", skillId: null, dependsOn: ["b"], requiredCapabilities: [], risk: "low", status: "planned" },
+        { id: "b", title: "B", description: "B", skillId: null, dependsOn: ["a"], requiredCapabilities: [], risk: "low", status: "planned" }
+      ] } }
+    };
+    const task = await runtime.enqueue(cyclic);
+    expect(await runtime.runOnce()).toBe(true);
+    expect((await runtime.get(task.id))?.status).toBe("queued");
+    expect((await runtime.getEvents(task.id))?.at(-1)?.event_type).toBe("task.retry_scheduled");
+  });
+  it("rejects unsupported task types at the API boundary", async () => {
+    const runtime = new TaskRuntime(null);
+    const app = Fastify();
+    registerTaskRoutes(app, runtime, async () => undefined);
+    const response = await app.inject({ method: "POST", url: "/v1/tasks", payload: { type: "shell.execute", payload: { command: "whoami" } } });
+    expect(response.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("supports cancellation before a worker claims the task", async () => {
+    const runtime = new TaskRuntime(null);
+    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { executionEnabled: false, steps: [{ id: "a", title: "A", description: "A", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } });
+    expect((await runtime.cancel(task.id))?.status).toBe("cancelled");
+    expect(await runtime.runOnce()).toBe(false);
+  });
+
+
+  it("isolates task reads, events, cancellation and listing by owner", async () => {
+    const runtime = new TaskRuntime(null);
+    const input = { type: "agent.plan.validate", payload: { plan: { executionEnabled: false, steps: [{ id: "a", title: "A", description: "A", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } };
+    const owned = await runtime.enqueue(input, "11111111-1111-4111-8111-111111111111");
+    expect(await runtime.get(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.getEvents(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.cancel(owned.id, "22222222-2222-4222-8222-222222222222")).toBeNull();
+    expect(await runtime.list("22222222-2222-4222-8222-222222222222")).toHaveLength(0);
+    expect(await runtime.list("11111111-1111-4111-8111-111111111111")).toHaveLength(1);
+  });
+
+  it("returns false when the queue is empty", async () => {
+    expect(await new TaskRuntime(null).runOnce()).toBe(false);
+  });
+});

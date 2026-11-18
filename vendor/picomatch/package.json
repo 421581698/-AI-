@@ -1,0 +1,16 @@
+{
+  "name": "picomatch",
+  "version": "4.0.8",
+  "description": "Our AI Hub maintained picomatch 4.0.7 compatibility fork with repeated-extglob ReDoS safeguards",
+  "license": "MIT",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "posix.js",
+    "lib"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=12"
+  }
+}
