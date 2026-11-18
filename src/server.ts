@@ -22,7 +22,7 @@ import { AuthService } from "./auth/service.js";
 import { consoleHtml } from "./console/page.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
-await app.register(cors, { origin: false });
+await app.register(cors, { origin: config.CORS_ORIGINS ? config.CORS_ORIGINS.split(",").map((value) => value.trim()).filter(Boolean) : false });
 const pool = config.DATABASE_URL ? new Pool({ connectionString: config.DATABASE_URL, max: 10 }) : null;
 const skillRegistry = new SkillRegistry([
   new URL("../skills", import.meta.url).pathname,
@@ -71,7 +71,7 @@ registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
 registerCollaborationEvaluationRoute(app, skillRegistry, audit);
 registerMcpRoute(app, skillRegistry, audit);
-app.get("/console", async (_request, reply) => reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").send(consoleHtml));
+app.get("/console", async (_request, reply) => reply.type("text/html; charset=utf-8").header("Cache-Control", "no-store").header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'").header("X-Content-Type-Options", "nosniff").header("Referrer-Policy", "no-referrer").send(consoleHtml));
 app.get("/v1/agents/catalog", async () => ({ agents: [ { id:"coordinator", role:"coordinator", executionEnabled:false }, { id:"specialist", role:"specialist", executionEnabled:false }, { id:"reviewer", role:"reviewer", executionEnabled:false } ] }));
 app.get("/v1/tools", async () => ({ tools: [ "list_skills", "get_skill", "plan_agent_task", "plan_collaboration", "evaluate_collaboration" ].map((name) => ({ name, enabled:true, executionMode:"read-only-or-planning" })) }));
 if (authService) await authService.register(app);
