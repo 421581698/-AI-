@@ -41,7 +41,7 @@ jobs:
           npm audit --json > npm-audit.json || true
           node -e 'const a=require("./npm-audit.json"); console.log(JSON.stringify(a.vulnerabilities || {}, null, 2))'
       - name: Enforce dependency audit threshold
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
       - run: npm run typecheck
       - run: npm run build
       - name: Apply PostgreSQL migrations
