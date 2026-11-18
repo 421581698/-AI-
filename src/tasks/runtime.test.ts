@@ -6,7 +6,7 @@ import { registerTaskRoutes } from "./routes.js";
 describe("TaskRuntime", () => {
   it("runs the allowlisted plan-validation task and records lifecycle events", async () => {
     const runtime = new TaskRuntime(null, 5);
-    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { planner: "deterministic-skill-planner", executionEnabled: false, steps: [{ id: "review" }] } } });
+    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { planner: "deterministic-skill-planner", executionEnabled: false, steps: [{ id: "review", title: "Review", description: "Validate", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } });
     expect(task.status).toBe("queued");
     expect(await runtime.runOnce()).toBe(true);
     const completed = await runtime.get(task.id);
@@ -27,7 +27,7 @@ describe("TaskRuntime", () => {
 
   it("supports cancellation before a worker claims the task", async () => {
     const runtime = new TaskRuntime(null);
-    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { executionEnabled: false, steps: [{ id: "a" }] } } });
+    const task = await runtime.enqueue({ type: "agent.plan.validate", payload: { plan: { executionEnabled: false, steps: [{ id: "a", title: "A", description: "A", skillId: null, dependsOn: [], requiredCapabilities: [], risk: "low", status: "planned" }] } } });
     expect((await runtime.cancel(task.id))?.status).toBe("cancelled");
     expect(await runtime.runOnce()).toBe(false);
   });
