@@ -83,7 +83,8 @@ app.post("/v1/memory/search", async (request, reply) => {
     const result = await pool.query(
       `SELECT id, namespace, content, source, confidence, metadata, created_at
        FROM memory_records
-       WHERE namespace = $1 AND expires_at IS NULL OR (namespace = $1 AND expires_at > now())
+       WHERE namespace = $1
+         AND (expires_at IS NULL OR expires_at > now())
          AND content ILIKE $2
        ORDER BY confidence DESC, created_at DESC LIMIT $3`,
       [parsed.data.namespace, `%${parsed.data.query}%`, parsed.data.limit]
