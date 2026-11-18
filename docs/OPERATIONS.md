@@ -54,11 +54,17 @@ For a planned production recovery, stop API writers, take a final backup of the 
 - Review reverse-proxy and application logs, but avoid logging bearer tokens, passwords, memory contents, or skill contents.
 - If compromise is suspected, isolate ingress first and preserve logs/backups for investigation.
 
-## Development-toolchain advisory: picomatch
+## Maintained picomatch security fork
 
-As of 2026-11-18, the full development dependency audit reports a high-severity picomatch advisory (GHSA-fc5q-39xc-vjpf / CVE-2026-112366) through the Vitest/Vite test-toolchain dependency graph. The npm package registry does not offer a version newer than the affected 4.0.7 range, and the upstream proposed fix was closed without being merged; the package maintainer disputes the report. Do not force-downgrade Vitest: the attempted 3.1.4 downgrade introduces additional vulnerable transitive packages, including critical tinypool advisories.
+As of 2026-11-18, the upstream picomatch project has not published an official release addressing GHSA-fc5q-39xc-vjpf / CVE-2026-112366. Our AI Hub now vendors the MIT-licensed picomatch 4.0.7 source in `vendor/picomatch` and applies the community-proposed repeated-extglob safeguards from [picomatch PR #258](https://github.com/micromatch/picomatch/pull/258), patch commit `578a87fae0ffd1f2e5420ff4d52135eb9210d169`.
 
-In this release, this dependency graph is development-only and is pruned from the production image. The production dependency audit remains clean. Do not pass untrusted user-controlled glob/extglob patterns to this toolchain. Keep the full audit visible, re-check the upstream advisory and npm releases on dependency updates, and remove this note only after a published fixed release is adopted and verified. This is a documented residual development-toolchain advisory, not a claim that the full dependency tree is vulnerability-free.
+The local package is versioned `4.0.8` solely as an independently maintained downstream fork so it satisfies the toolchain's compatible dependency range. **It is not an official picomatch release and the patch is not merged upstream.** The root development dependency points to this repository-local package. The Docker build copies `vendor/` before installing dependencies so the production build uses the same patched source before pruning development dependencies.
+
+Regression coverage in `tests/picomatch-redos.test.ts` checks single-branch wildcard extglobs, multi-character repeated-prefix overlap, safe common patterns, the explicit safeguard opt-out, and hostile non-matching input in a bounded child process. Do not set `maxExtglobRecursion: false` when processing untrusted patterns.
+
+Verification on the current PR head: [CI run #44283199388](https://github.com/421581698/-AI-/actions/runs/44283199388) passed. The full `npm audit --json` report contained an empty vulnerabilities object; the production-only audit also reported 0 vulnerabilities. Typecheck, build, PostgreSQL migrations, 41 test files / 167 tests, Docker production image build, PG16 backup/restore round-trip, and production-container smoke test all passed.
+
+Treat this as a project-maintained security fork: review and rerun regression tests when rebasing onto a newer upstream release, retain the MIT license, and replace the local fork only after an official fixed release is reviewed and verified.
 
 ## Current release limitations
 
