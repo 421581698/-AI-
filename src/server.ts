@@ -33,7 +33,7 @@ app.decorateRequest("principal", null);
 const authService = pool ? new AuthService(pool, config.AUTH_TOKEN_SECRET ?? "development-only-secret-change-me-please", config.API_KEY) : null;
 app.addHook("onClose", async () => { await pool?.end(); });
 app.addHook("onRequest", async (request, reply) => {
-  if (request.url === "/health" || request.url.startsWith("/v1/auth/register") || request.url.startsWith("/v1/auth/login")) return;
+  if (request.url === "/health" || request.url === "/console" || request.url.startsWith("/v1/auth/register") || request.url.startsWith("/v1/auth/login")) return;
   const authorization = request.headers.authorization;
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
   if (authService) {
@@ -95,12 +95,13 @@ app.get<{ Params: { id: string } }>("/v1/skills/:id", async (request, reply) => 
   };
 });
 
-app.get("/health", async () => {
+app.get("/health", async (_request, reply) => {
   let database: "connected" | "unconfigured" | "unavailable" = "unconfigured";
   if (pool) {
     try { await pool.query("SELECT 1"); database = "connected"; }
     catch { database = "unavailable"; }
   }
+  if (database === "unavailable") return reply.code(503).send({ ok: false, service: "our-ai-hub", database, timestamp: new Date().toISOString() });
   return {
     ok: database !== "unavailable",
     service: "our-ai-hub",
