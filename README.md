@@ -9,3 +9,13 @@
 ## Status
 
 Bootstrap repository initialized. See the development branch for the initial implementation plan.
+
+## Coding-agent web standards
+
+The repository includes the official GoogleChrome `modern-web-guidance` Agent Skill at
+`.agents/skills/modern-web-guidance/SKILL.md`. Coding agents must consult it before
+browser-facing HTML, CSS, or client-side JavaScript work. The skill searches and retrieves
+task-specific modern platform guidance and requires implementation/fallback verification.
+
+The skill is guidance for coding agents; it does not by itself install browser features,
+change the model weights, or enable runtime capabilities in the Our AI Hub API.
