@@ -123,8 +123,8 @@ app.post("/v1/memory/records", async (request, reply) => {
   const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;
   if (pool) {
     await pool.query(
-      `INSERT INTO memory_records(id, namespace, content, source, confidence, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO memory_records(id, owner_id, namespace, content, source, confidence, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [id, ownerId, parsed.data.namespace, parsed.data.content, parsed.data.source, parsed.data.confidence, JSON.stringify(parsed.data.metadata)]
     );
   } else {
@@ -143,24 +143,27 @@ app.post("/v1/memory/search", async (request, reply) => {
   if (!parsed.success) return reply.code(400).send({ error: "invalid_request", issues: parsed.error.issues });
 
   if (pool) {
+    const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;
     const result = await pool.query(
       `SELECT id, namespace, content, source, confidence, metadata, created_at,
               greatest(
-                ts_rank(search_vector, plainto_tsquery('simple', $2)),
-                CASE WHEN content ILIKE $3 THEN 0.05 ELSE 0 END
+                ts_rank(search_vector, plainto_tsquery('simple', $3)),
+                CASE WHEN content ILIKE $4 THEN 0.05 ELSE 0 END
               ) AS score
        FROM memory_records
-       WHERE namespace = $1
+       WHERE owner_id IS NOT DISTINCT FROM $1
+         AND namespace = $2
          AND (expires_at IS NULL OR expires_at > now())
          AND (search_vector @@ plainto_tsquery('simple', $3) OR content ILIKE $4)
        ORDER BY score DESC, confidence DESC, created_at DESC
-       LIMIT $4`,
+       LIMIT $5`,
       [ownerId, parsed.data.namespace, parsed.data.query, `%${parsed.data.query}%`, parsed.data.limit]
     );
     await audit(request.id, "memory.search", "success", { namespace: parsed.data.namespace, count: result.rowCount ?? 0 });
     return { results: result.rows, mode: "postgres-lexical" };
   }
 
+  const ownerId = request.principal?.authType === "bootstrap" ? null : request.principal?.userId ?? null;
   const terms = parsed.data.query.toLowerCase().split(/\s+/).filter(Boolean);
   const results = [...memoryStore.values()]
     .filter((item) => item.ownerId === ownerId && item.namespace === parsed.data.namespace)
