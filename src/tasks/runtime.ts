@@ -13,7 +13,7 @@ export type TaskEvent = {
   id: string | number; task_id: string; event_type: string; from_status: string | null;
   to_status: string; payload: Record<string, unknown>; created_at: string;
 };
-type MemoryTask = TaskRecord & { availableAt: number; lockedBy: string | null; lockedUntil: number | null };
+type MemoryTask = TaskRecord & { ownerId: string | null; availableAt: number; lockedBy: string | null; lockedUntil: number | null };
 const LEASE_MS = 30_000;
 const MAX_ERROR_LENGTH = 500;
 
@@ -39,19 +39,19 @@ export class TaskRuntime {
     this.events.set(taskId, list);
   }
 
-  async enqueue(input: TaskInput): Promise<TaskRecord> {
+  async enqueue(input: TaskInput, ownerId: string | null = null): Promise<TaskRecord> {
     const id = randomUUID();
     if (this.pool) {
       const result = await this.pool.query(
-        "INSERT INTO tasks(id,status,input,max_attempts) VALUES($1,'queued',$2,3) RETURNING id,status,input,attempts,max_attempts,created_at,updated_at",
-        [id, JSON.stringify(input)]
+        "INSERT INTO tasks(id,owner_id,status,input,max_attempts) VALUES($1,$2,'queued',$3,3) RETURNING id,status,input,attempts,max_attempts,created_at,updated_at",
+        [id, ownerId, JSON.stringify(input)]
       );
       const row = result.rows[0];
       await this.event(id, "task.queued", null, "queued", { type: input.type });
       return this.mapRow(row);
     }
     const now = new Date().toISOString();
-    const task: MemoryTask = { id, status: "queued", input, attempts: 0, max_attempts: 3, created_at: now, updated_at: now, availableAt: Date.now(), lockedBy: null, lockedUntil: null };
+    const task: MemoryTask = { id, ownerId, status: "queued", input, attempts: 0, max_attempts: 3, created_at: now, updated_at: now, availableAt: Date.now(), lockedBy: null, lockedUntil: null };
     this.memory.set(id, task);
     await this.event(id, "task.queued", null, "queued", { type: input.type });
     return this.publicTask(task);
@@ -65,17 +65,17 @@ export class TaskRuntime {
     return record;
   }
 
-  async get(id: string): Promise<TaskRecord | null> {
+  async get(id: string, ownerId: string | null = null): Promise<TaskRecord | null> {
     if (this.pool) {
-      const r = await this.pool.query("SELECT id,status,input,result,error,attempts,max_attempts,created_at,updated_at FROM tasks WHERE id=$1", [id]);
+      const r = await this.pool.query("SELECT id,status,input,result,error,attempts,max_attempts,created_at,updated_at FROM tasks WHERE id=$1 AND owner_id IS NOT DISTINCT FROM $2", [id, ownerId]);
       return r.rowCount ? this.mapRow(r.rows[0]) : null;
     }
     const task = this.memory.get(id);
-    return task ? this.publicTask(task) : null;
+    return task && task.ownerId === ownerId ? this.publicTask(task) : null;
   }
 
-  async getEvents(id: string): Promise<TaskEvent[] | null> {
-    if (!(await this.get(id))) return null;
+  async getEvents(id: string, ownerId: string | null = null): Promise<TaskEvent[] | null> {
+    if (!(await this.get(id, ownerId))) return null;
     if (this.pool) {
       const r = await this.pool.query("SELECT id,task_id,event_type,from_status,to_status,payload,created_at FROM task_events WHERE task_id=$1 ORDER BY id", [id]);
       return r.rows;
@@ -83,17 +83,17 @@ export class TaskRuntime {
     return this.events.get(id) ?? [];
   }
 
-  async cancel(id: string): Promise<TaskRecord | null> {
+  async cancel(id: string, ownerId: string | null = null): Promise<TaskRecord | null> {
     if (this.pool) {
       const r = await this.pool.query(
-        "UPDATE tasks SET status='cancelled',locked_by=NULL,locked_until=NULL,updated_at=now() WHERE id=$1 AND status='queued' RETURNING id,status,input,attempts,max_attempts,created_at,updated_at",
+        "UPDATE tasks SET status='cancelled',locked_by=NULL,locked_until=NULL,updated_at=now() WHERE id=$1 AND owner_id IS NOT DISTINCT FROM $2 AND status='queued' RETURNING id,status,input,attempts,max_attempts,created_at,updated_at",
         [id]
       );
       if (r.rowCount) {
         await this.event(id, "task.cancelled", "queued", "cancelled");
         return this.mapRow(r.rows[0]);
       }
-      return this.get(id);
+      return this.get(id, ownerId);
     }
     const task = this.memory.get(id);
     if (!task) return null;
