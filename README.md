@@ -4,7 +4,7 @@
 
 ## Self-hosted deployment
 
-Open the console at `/console`; see the [API Reference](docs/API.md) and [Deployment Guide](docs/DEPLOYMENT.md). Copy `.env.example`, replace both secrets, then run `docker compose up --build -d`. The API is exposed on `API_PORT`; PostgreSQL remains private to the Compose network.
+Open the console at `/console`; see the [API Reference](docs/API.md) and [Deployment Guide](docs/DEPLOYMENT.md). Copy `.env.example`, replace all required secrets, then run `docker compose up --build -d`. The API is exposed on `API_PORT`; PostgreSQL remains private to the Compose network.
 
 ## Development
 
