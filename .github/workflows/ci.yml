@@ -40,6 +40,8 @@ jobs:
         run: |
           npm audit --json > npm-audit.json || true
           node -e 'const a=require("./npm-audit.json"); console.log(JSON.stringify(a.vulnerabilities || {}, null, 2))'
+      - name: Apply non-breaking dependency security fixes
+        run: npm audit fix
       - name: Enforce dependency audit threshold
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
