@@ -8,6 +8,8 @@ import { SkillRegistry } from "./skills/registry.js";
 import { registerSkillSelectorRoute } from "./skills/selector-route.js";
 import { registerSkillContextRoute } from "./skills/context-route.js";
 import { registerSkillPermissionRoute } from "./skills/permission-route.js";
+import { SkillRuntime } from "./skills/runtime.js";
+import { registerSkillRuntimeRoute } from "./skills/runtime-route.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -40,6 +42,8 @@ async function audit(requestId: string, action: string, outcome: string, details
 registerSkillSelectorRoute(app, skillRegistry, audit);
 registerSkillContextRoute(app, skillRegistry, audit);
 registerSkillPermissionRoute(app, skillRegistry, audit);
+const skillRuntime = new SkillRuntime(skillRegistry);
+registerSkillRuntimeRoute(app, skillRuntime, audit);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
