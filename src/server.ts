@@ -18,6 +18,7 @@ import { registerCollaborationEvaluationRoute } from "./agents/collaboration-eva
 import { TaskRuntime } from "./tasks/runtime.js";
 import { registerTaskRoutes } from "./tasks/routes.js";
 import { registerMcpRoute } from "./mcp/route.js";
+import { AuthService } from "./auth/service.js";
 
 const app = Fastify({ logger: true, genReqId: () => randomUUID(), bodyLimit: 1_048_576 });
 await app.register(cors, { origin: false });
@@ -27,11 +28,22 @@ const skillRegistry = new SkillRegistry([
   new URL("../.agents/skills", import.meta.url).pathname
 ]);
 
+app.decorateRequest("principal", null);
+const authService = pool ? new AuthService(pool, config.AUTH_TOKEN_SECRET ?? "development-only-secret-change-me-please", config.API_KEY) : null;
 app.addHook("onClose", async () => { await pool?.end(); });
 app.addHook("onRequest", async (request, reply) => {
-  if (request.url === "/health") return;
-  if (config.API_KEY && request.headers.authorization !== `Bearer ${config.API_KEY}`) {
-    await reply.code(401).send({ error: "unauthorized" });
+  if (request.url === "/health" || request.url.startsWith("/v1/auth/register") || request.url.startsWith("/v1/auth/login")) return;
+  const authorization = request.headers.authorization;
+  const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
+  if (authService) {
+    request.principal = await authService.authenticate(token);
+    if (!request.principal) return reply.code(401).send({ error: "unauthorized" });
+  } else if (config.API_KEY && token === config.API_KEY) {
+    request.principal = { userId: "00000000-0000-4000-8000-000000000001", email: "bootstrap@local", role: "admin", authType: "bootstrap" };
+  } else if (config.NODE_ENV === "production" || config.API_KEY) {
+    return reply.code(401).send({ error: "unauthorized" });
+  } else {
+    request.principal = { userId: "00000000-0000-4000-8000-000000000002", email: "local-dev@local", role: "admin", authType: "bootstrap" };
   }
 });
 
@@ -58,6 +70,7 @@ registerAgentPlannerRoute(app, skillRegistry, audit);
 registerCollaborationRoute(app, skillRegistry, audit);
 registerCollaborationEvaluationRoute(app, skillRegistry, audit);
 registerMcpRoute(app, skillRegistry, audit);
+if (authService) await authService.register(app);
 
 app.get("/v1/skills", async () => {
   const skills = await skillRegistry.list();
