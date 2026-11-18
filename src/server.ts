@@ -112,7 +112,7 @@ app.post("/v1/memory/search", async (request, reply) => {
 const taskInput = z.object({ type: z.string().min(1).max(120), payload: z.record(z.string(), z.unknown()) });
 type Task = { id: string; status: string; input: z.infer<typeof taskInput>; createdAt: string };
 const tasks = new Map<string, Task>();
-type TaskEvent = { id: string; taskId: string; eventType: string; fromStatus: string | null; toStatus: string; payload: Record<string, unknown>; createdAt: string };
+type TaskEvent = { id: string; task_id: string; event_type: string; from_status: string | null; to_status: string; payload: Record<string, unknown>; created_at: string };
 const taskEvents = new Map<string, TaskEvent[]>();
 function appendTaskEvent(event: TaskEvent) {
   const events = taskEvents.get(event.taskId) ?? [];
@@ -143,7 +143,7 @@ app.post("/v1/tasks", async (request, reply) => {
       [id, JSON.stringify({ type: parsed.data.type })]
     );
   } else {
-    appendTaskEvent({ id: randomUUID(), taskId: id, eventType: "task.queued", fromStatus: null, toStatus: "queued", payload: { type: parsed.data.type }, createdAt: queuedAt });
+    appendTaskEvent({ id: randomUUID(), task_id: id, event_type: "task.queued", from_status: null, to_status: "queued", payload: { type: parsed.data.type }, created_at: queuedAt });
   }
   await audit(request.id, "task.create", "success", { id, type: parsed.data.type });
   return reply.code(202).send(task);
@@ -186,7 +186,7 @@ app.post<{ Params: { id: string } }>("/v1/tasks/:id/cancel", async (request, rep
   if (!task) return reply.code(404).send({ error: "task_not_found" });
   if (task.status === "queued") {
     task.status = "cancelled";
-    appendTaskEvent({ id: randomUUID(), taskId: task.id, eventType: "task.cancelled", fromStatus: "queued", toStatus: "cancelled", payload: {}, createdAt: new Date().toISOString() });
+    appendTaskEvent({ id: randomUUID(), task_id: task.id, event_type: "task.cancelled", from_status: "queued", to_status: "cancelled", payload: {}, created_at: new Date().toISOString() });
   }
   return task;
 });
