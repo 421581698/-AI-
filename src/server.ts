@@ -122,7 +122,7 @@ app.post("/v1/memory/search", async (request, reply) => {
     return { results: result.rows, mode: "postgres-lexical" };
   }
 
-  const terms = parsed.data.query.toLowerCase().split(/\\s+/).filter(Boolean);
+  const terms = parsed.data.query.toLowerCase().split(/\s+/).filter(Boolean);
   const results = [...memoryStore.values()]
     .filter((item) => item.namespace === parsed.data.namespace)
     .map((item) => ({ item, score: terms.reduce((n, term) => n + (item.content.toLowerCase().includes(term) ? 1 : 0), 0) }))
